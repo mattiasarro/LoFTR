@@ -8,6 +8,7 @@ dependencies:
   - python=3.8
   - cudatoolkit=10.2
   - pytorch=1.8.1
+  - mkl==2024.0
   - pip
   - pip:
       - -r requirements.txt

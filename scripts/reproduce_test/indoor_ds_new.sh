@@ -1,12 +1,12 @@
-#!/bin/bash -l
+#!/bin/bash
 # a indoor_ds model with the pos_enc impl bug fixed.
 
-SCRIPTPATH=$(dirname $(readlink -f "$0"))
-PROJECT_DIR="${SCRIPTPATH}/../../"
+# SCRIPTPATH=$(dirname $(readlink -f "$0"))
+# PROJECT_DIR="${SCRIPTPATH}/../../"
 
-# conda activate loftr
-export PYTHONPATH=$PROJECT_DIR:$PYTHONPATH
-cd $PROJECT_DIR
+# # conda activate loftr
+# export PYTHONPATH=$PROJECT_DIR:$PYTHONPATH
+# cd $PROJECT_DIR
 
 data_cfg_path="configs/data/scannet_test_1500.py"
 main_cfg_path="configs/loftr/indoor/scannet/loftr_ds_eval_new.py"
