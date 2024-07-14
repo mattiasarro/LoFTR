@@ -25,3 +25,10 @@ tools/draw_QccDayNights.py
 scripts/slurm/
 scripts/sbatch_submit.sh
 src/utils/client.py
+
+data/megadepth_v1/
+data/testdata/
+data/train-data/
+data/MegaDepth_v1.tar.gz
+data/testdata-*
+data/train-data-*

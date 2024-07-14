@@ -11,11 +11,10 @@
 ```bash
 git clone https://github.com/mattiasarro/LoFTR.git
 cd /home/ec2-user/LoFTR
-conda env create -f environment.yaml
-conda init
-# log out of SSH session and log back in (for conda init to take effect)
-cd /home/ec2-user/LoFTR
-conda activate loftr
+# install and init pyenv
+pyenv virtualenv 3.8.10 loftr
+pyenv activate loftr
+pip install -r requirements.txt
 ```
 
 ## Fix scripts
@@ -42,9 +41,9 @@ nohup wget https://www.cs.cornell.edu/projects/megadepth/dataset/Megadepth_v1/Me
 The above takes >2h since it's a 200GB dataset. `nohup` and trailing `&` ensure it continues to download if your ssh connection times out. Once it's finished extract it:
 
 ```bash
-mkdir -p /home/ec2-user/LoFTR/data/megadepth_v1 && tar -xzvf MegaDepth_v1.tar.gz -C /home/ec2-user/LoFTR/data/megadepth_v1
-ln -sv /home/ec2-user/LoFTR/data/megadepth_v1/phoenix /home/ec2-user/LoFTR/data/megadepth/train
-ln -sv /home/ec2-user/LoFTR/data/megadepth_v1/phoenix /home/ec2-user/LoFTR/data/megadepth/test
+mkdir -p /home/LoFTR/data/megadepth_v1 && tar -xzvf MegaDepth_v1.tar.gz -C /home/LoFTR/data/megadepth_v1
+ln -sv /home/LoFTR/data/megadepth_v1/phoenix /home/LoFTR/data/megadepth/train
+ln -sv /home/LoFTR/data/megadepth_v1/phoenix /home/LoFTR/data/megadepth/test
 ```
 
 ## Get the test data
@@ -88,7 +87,7 @@ tar xf testdata/megadepth_test_1500.tar
 mv megadepth_test_1500/Undistorted_SfM/* megadepth/test/
 tar xf testdata/scannet_test_1500.tar
 mv scannet_test_1500/* scannet/test/
-cd ~/LoFTR
+cd ..
 mkdir weights
 mv data/*.ckpt weights/
 ```
@@ -99,7 +98,7 @@ Run on $EC2_HOST:
 
 ```bash
 cd ~/LoFTR
-conda activate loftr
+pyenv activate loftr
 ./scripts/reproduce_test/indoor_ds_new.sh # fixed as described in "Fix scripts" section
 ```
 
@@ -111,7 +110,8 @@ Run on $EC2_HOST:
 
 ```bash
 cd ~/LoFTR
-conda activate loftr
+pyenv activate loftr
+mkdir data/megadepth/index/scene_info_0.1_0.7_no_sfm/
 python fix_datasets.py # run this once, after megadepth is downloaded and extracted
 ./scripts/reproduce_train/outdoor_ds.sh # fixed as described in "Fix scripts" section
 ```

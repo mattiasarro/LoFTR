@@ -5,7 +5,9 @@ import pprint
 from distutils.util import strtobool
 from pathlib import Path
 from loguru import logger as loguru_logger
+from copy import deepcopy
 
+import torch
 import pytorch_lightning as pl
 from pytorch_lightning.utilities import rank_zero_only
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -114,5 +116,30 @@ trainer = pl.Trainer.from_argparse_args(
 loguru_logger.info(f"Trainer initialized!")
 loguru_logger.info(f"Start training!")
 trainer.fit(model, datamodule=data_module)
+
+# %%
+# MVP of inference for debugging and understanding.
+
+def to_device(v, device):
+    if isinstance(v, torch.Tensor):
+        return v.to(device)
+    elif isinstance(v, list):
+        return [to_device(item, device) for item in v]
+    elif isinstance(v, dict):
+        return {k: to_device(item, device) for k, item in v.items()}
+    else:
+        return v
+
+data_module.prepare_data()
+data_module.setup(stage='fit')
+
+train_dataloader = data_module.train_dataloader()
+batch = next(iter(train_dataloader))
+batch.keys()
+
+# %%
+batch2 = to_device(deepcopy(batch), model.device)
+model._trainval_inference(batch2)
+batch2.keys()
 
 # %%
