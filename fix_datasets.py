@@ -6,40 +6,29 @@
 import numpy as np
 from numpy import load
 import os
+import shutil
 
-directory = 'data/megadepth/index/scene_info_0.1_0.7'
-directory2 = 'data/megadepth/index/scene_info_0.1_0.7_no_sfm/'
-os.mkdir(directory2)
+def fix_scene_info(scene_info_dir):
+    scene_info_dir_no_sfm = f'{scene_info_dir}_no_sfm/'
+    if os.path.exists(scene_info_dir_no_sfm):
+        shutil.rmtree(scene_info_dir_no_sfm)
+    os.mkdir(scene_info_dir_no_sfm)
 
-for filename in os.listdir(directory):
-    f_npz = os.path.join(directory,filename)
-    data = load(f_npz, allow_pickle = True)
-    for count, image_path in enumerate(data['image_paths']):
-        if image_path is not None:
-            if 'Undistorted_SfM' in image_path:
-                data['image_paths'][count] = data['depth_paths'][count].replace('depths', 'imgs').replace('h5', 'jpg')
-    
-    data['pair_infos'] = np.asarray(data['pair_infos'], dtype=object)
-    new_file = directory2 + filename
-    np.savez(new_file, **data)
-    print("Saved to ", new_file)
+    for filename in os.listdir(scene_info_dir):
+        f_npz = os.path.join(scene_info_dir,filename)
+        scene_info = load(f_npz, allow_pickle=True)
 
-# %%
-directory = 'data/megadepth/index/scene_info_val_1500'
-directory2 = 'data/megadepth/index/scene_info_val_1500_no_sfm/'
-os.mkdir(directory2)
+        for i, image_path in enumerate(scene_info['image_paths']):
+            if image_path is not None:
+                if 'Undistorted_SfM' in image_path:
+                    ext = image_path.split('.')[-1]
+                    depth_path = scene_info['depth_paths'][i]
+                    scene_info['image_paths'][i] = depth_path.replace('depths', 'imgs').replace('h5', ext)
+        
+        scene_info['pair_infos'] = np.asarray(scene_info['pair_infos'], dtype=object)
+        new_file = os.path.join(scene_info_dir_no_sfm, filename)
+        np.savez(new_file, **scene_info)
+        print("Saved to ", new_file)
 
-for filename in os.listdir(directory):
-    f_npz = os.path.join(directory,filename)
-    data = load(f_npz, allow_pickle = True)
-    for count, image_path in enumerate(data['image_paths']):
-        if image_path is not None:
-            if 'Undistorted_SfM' in image_path:
-                data['image_paths'][count] = data['depth_paths'][count].replace('depths', 'imgs').replace('h5', 'jpg')
-    
-    data['pair_infos'] = np.asarray(data['pair_infos'], dtype=object)
-    new_file = directory2 + filename
-    np.savez(new_file, **data)
-    print("Saved to ", new_file)
-
-# %%
+fix_scene_info('data/megadepth/index/scene_info_0.1_0.7')
+fix_scene_info('data/megadepth/index/scene_info_val_1500')
