@@ -1,17 +1,66 @@
-## Create a new EC2 instance
+## Setup
 
-1. AMI: `Deep Learning OSS Nvidia Driver AMI GPU PyTorch 1.13.1 (Amazon Linux 2)`
-1. Instance type: `g5.*` (depending on how many GPUs you want)
-1. Key pair: generate or use an existing one. Below examples assume you use the key `my_key.pem`.
-1. Configure storge: 1000GB (since the MedaDepth dataset is large)
-1. Log into the instance with SSH (instructions in AWS console under "Connect" button). It's convenient to also attach VSCode to the instance over SSH using the same CLI command. Replace `root@` with `ec2-user@` and use an absolute path for the key file and chmod 600 the file.
+This setup assumes we have an Ubuntu machine with a compatible GPU. This was tested on Ubuntu 22.04.4 with NVIDIA RTX 6000 Ada GPUs.
 
-## Setup LoFTR
+We use the following env vars (inside the Ubuntu machine and localhost), which you should customise:
 
 ```bash
+export UBUNTU_HOST=""
+export UBUNTU_USER=""
+export UBUNTU_LOFTR_HOME="/home/LoFTR"
+```
+
+## Setup CUDA
+
+Run on `$UBUNTU_HOST`:
+
+```bash
+sudo apt-get install linux-headers-$(uname -r)
+sudo apt-key del 7fa2af80
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb
+
+sudo apt-get update
+sudo apt-get install linux-headers-5.19.0-1010-nvidia-lowlatency
+sudo apt-get install -y cuda-12-3 nvidia-gds
+
+# might not be needed on first install, but I had to run:
+sudo apt-get install --reinstall nvidia-driver-555
+sudo reboot
+```
+
+Ensure these env vars are set in your shell (e.g. add them to .bashrc):
+
+```bash
+export PATH=/usr/local/cuda-12.3/bin${PATH:+:${PATH}}
+export LD_LIBRARY_PATH=/usr/local/cuda-12.3/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+```
+
+## Setup pyenv
+
+Install and init pyenv by running the below commands (or look for a possibly updated way to do it in the docs). 
+
+Run on `$UBUNTU_HOST`:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git curl build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev wget llvm libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+curl https://pyenv.run | bash
+
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
+echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
+echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+## Setup LoFTR 
+
+Run on `$UBUNTU_HOST`:
+
+```bash
+cd $UBUNTU_LOFTR_HOME/..
 git clone https://github.com/mattiasarro/LoFTR.git
-cd /home/ec2-user/LoFTR
-# install and init pyenv
+cd LoFTR
 pyenv virtualenv 3.8.10 loftr
 pyenv activate loftr
 pip install -r requirements.txt
@@ -19,7 +68,7 @@ pip install -r requirements.txt
 
 ## Fix scripts
 
-For a train/test script such as `outdoor_ds.sh` you need to run the following steps:
+Run on `$UBUNTU_HOST`:
 
 1. `cmod +x scripts/reproduce_train/outdoor_ds.sh`
 1. remove `-l` from the first line, so that it's just `#!/bin/bash`
@@ -28,7 +77,7 @@ For a train/test script such as `outdoor_ds.sh` you need to run the following st
 
 ## Get the train data
 
-Run on the EC2 instance:
+Run on `$UBUNTU_HOST`:
 
 ```bash
 # to ensure we can SCP files into the machine, run on the ec2 instance
@@ -41,12 +90,14 @@ nohup wget https://www.cs.cornell.edu/projects/megadepth/dataset/Megadepth_v1/Me
 The above takes >2h since it's a 200GB dataset. `nohup` and trailing `&` ensure it continues to download if your ssh connection times out. Once it's finished extract it:
 
 ```bash
-mkdir -p /home/LoFTR/data/megadepth_v1 && tar -xzvf MegaDepth_v1.tar.gz -C /home/LoFTR/data/megadepth_v1
-ln -sv /home/LoFTR/data/megadepth_v1/phoenix /home/LoFTR/data/megadepth/train
-ln -sv /home/LoFTR/data/megadepth_v1/phoenix /home/LoFTR/data/megadepth/test
+mkdir -p $UBUNTU_LOFTR_HOME/data/megadepth_v1 && tar -xzvf MegaDepth_v1.tar.gz -C $UBUNTU_LOFTR_HOME/data/megadepth_v1
+ln -sv $UBUNTU_LOFTR_HOME/data/megadepth_v1/phoenix $UBUNTU_LOFTR_HOME/data/megadepth/train
+ln -sv $UBUNTU_LOFTR_HOME/data/megadepth_v1/phoenix $UBUNTU_LOFTR_HOME/data/megadepth/test
 ```
 
 ## Get the test data
+
+On localhost (macOS):
 
 1. Go to https://drive.google.com/drive/folders/1DOcOPZb3-5cWxLqn256AhwUVjBPifhuf
 1. Right-click on the three dots of `testdata` and click "Download"
@@ -54,27 +105,25 @@ ln -sv /home/LoFTR/data/megadepth_v1/phoenix /home/LoFTR/data/megadepth/test
 1. Double-click on `weights` and download these 1-by-1.
 1. Upload the downloaded files to the EC2 instance. Note that due to how Drive downloads the files or new versions uploaded by the authors, the file names might be slightly different - adjust the steps in this and the following section accordingly.
 
-Run on localhost:
+On localhost (macOS):
 
 ```bash
-KEY_LOC="/Users/m/code/smfl/loftr/mattias_crunch_london.pem" # TODO change this
-EC2_HOST="ec2-13-40-101-148.eu-west-2.compute.amazonaws.com" # TODO change this
-scp -i $KEY_LOC ~/Downloads/testdata-20240628T083243Z-001.zip ec2-user@$EC2_HOST:/home/ec2-user/LoFTR/data/
-scp -i $KEY_LOC ~/Downloads/scannet_indices-001.tar ec2-user@$EC2_HOST:/home/ec2-user/LoFTR/data/
-scp -i $KEY_LOC ~/Downloads/train-data-20240628T083709Z-003.zip ec2-user@$EC2_HOST:/home/ec2-user/LoFTR/data/
-scp -i $KEY_LOC ~/Downloads/cfg_1513_-1_0.2_0.8_0.15_reduced_v2-002.tar ec2-user@$EC2_HOST:/home/ec2-user/LoFTR/data/
-scp -i $KEY_LOC ~/Downloads/outdoor_ot.ckpt ec2-user@$EC2_HOST:/home/ec2-user/LoFTR/data/
-scp -i $KEY_LOC ~/Downloads/outdoor_ds.ckpt ec2-user@$EC2_HOST:/home/ec2-user/LoFTR/data/
-scp -i $KEY_LOC ~/Downloads/indoor_ot.ckpt ec2-user@$EC2_HOST:/home/ec2-user/LoFTR/data/
-scp -i $KEY_LOC ~/Downloads/indoor_ds_new.ckpt ec2-user@$EC2_HOST:/home/ec2-user/LoFTR/data/
+scp ~/Downloads/testdata-20240628T083243Z-001.zip $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_LOFTR_HOME/data/
+scp ~/Downloads/scannet_indices-001.tar $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_LOFTR_HOME/data/
+scp ~/Downloads/train-data-20240628T083709Z-003.zip $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_LOFTR_HOME/data/
+scp ~/Downloads/cfg_1513_-1_0.2_0.8_0.15_reduced_v2-002.tar $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_LOFTR_HOME/data/
+scp ~/Downloads/outdoor_ot.ckpt $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_LOFTR_HOME/data/
+scp ~/Downloads/outdoor_ds.ckpt $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_LOFTR_HOME/data/
+scp ~/Downloads/indoor_ot.ckpt $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_LOFTR_HOME/data/
+scp ~/Downloads/indoor_ds_new.ckpt $UBUNTU_USER@$UBUNTU_HOST:$UBUNTU_LOFTR_HOME/data/
 ```
 
 ### Extract the data to correct locations
 
-Run on $EC2_HOST:
+Run on `$UBUNTU_HOST`:
 
 ```bash
-cd ~/LoFTR/data
+cd $UBUNTU_LOFTR_HOME/data
 unzip train-data-20240628T083709Z-003.zip
 unzip testdata-20240628T083243Z-001.zip
 mv cfg_1513_-1_0.2_0.8_0.15_reduced_v2-002.tar train-data/
@@ -94,10 +143,10 @@ mv data/*.ckpt weights/
 
 ## Run the tests
 
-Run on $EC2_HOST:
+Run on `$UBUNTU_HOST`:
 
 ```bash
-cd ~/LoFTR
+cd $UBUNTU_LOFTR_HOME
 pyenv activate loftr
 ./scripts/reproduce_test/indoor_ds_new.sh # fixed as described in "Fix scripts" section
 ```
@@ -106,10 +155,10 @@ Runs the "ds" (dual softmax) eval (similar "ot" script is for Optimal Transport)
 
 ## Run training
 
-Run on $EC2_HOST:
+Run on `$UBUNTU_HOST`:
 
 ```bash
-cd ~/LoFTR
+cd $UBUNTU_LOFTR_HOME
 pyenv activate loftr
 mkdir data/megadepth/index/scene_info_0.1_0.7_no_sfm/
 python fix_datasets.py # run this once, after megadepth is downloaded and extracted
